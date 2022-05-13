@@ -1,177 +1,212 @@
 #Developed by u/Jumping_Pig, Steam: Piggy
 import os
+import ctypes
 from PIL import Image, ImageOps
 from numpy import asarray
 import cv2 as cv
 import easyocr
 
 
+os.chdir(os.path.split(__file__)[0])
+
+#custom errors
+def throw(e, s):
+    try: f.close()
+    finally:
+        os.remove(os.path.join(os.getcwd(), 'temp.txt'))
+        ctypes.windll.user32.MessageBoxW(0, e, s, 0)
+        exit()
+
+
+
+#read the screenshot directory location
 configFile = open(r'config.txt', 'r')
 scDirectory = configFile.readline().split('=')[1].strip()
+
+#if first stat for the file then don't preface with newline
 first = True
+#if no files were worked on
+noFiles = True
+
+#reset the temporary stats file, or create it if not there
 f = open('temp.txt', 'w')
 f.write("")
 f.close()
-if(not os.path.exists(os.path.join(scDirectory, 'Completed'))):
-    os.mkdir(os.path.join(scDirectory, 'Completed'))
+
+#if the completed screenshot folder DNE, create it
+if(not os.path.exists(os.path.join(scDirectory, 'Completed'))): os.mkdir(os.path.join(scDirectory, 'Completed'))
+
+#sort the directory for ordering screenshots by timestamp
 dirList = sorted(os.listdir(scDirectory))
-for i in range(len(dirList)):
-    if(len(dirList) < 3): exit()
-    if(not dirList[i].endswith('.jpg') and not dirList[i+1].endswith('.jpg')):
-        continue
-    sc = os.path.join(scDirectory, dirList[i])
-    gray = cv.imread(sc)
-    gray = cv.cvtColor(gray, cv.COLOR_RGB2GRAY)
-    im = Image.fromarray(gray)
-    im = ImageOps.invert(im)
-    reader = easyocr.Reader(['en'])
-    w, h = im.size
+
+#create easyOCR reader object, for english.
+reader = easyocr.Reader(['en'])
+
+#for each file in the directory...
+for i in range(0, len(dirList), 2):
+    #if file 1&2 isn't jpg... or file 3&4... etc. then skip
+    if(not dirList[i].endswith('.jpg') and not dirList[i+1].endswith('.jpg')): continue
+    #get summary screenshot path
+    summary = os.path.join(scDirectory, dirList[i])
+    
+    #black background, white text
+    bwSummary = cv.cvtColor(cv.imread(summary), cv.COLOR_RGB2GRAY)
+    #black text on white background is best for OCR
+    bwSummary = ImageOps.invert(Image.fromarray(bwSummary))
+    
+    #determine the pixel locations based on ratio of resolutions (16:9 aspect ratio ONLY)
+    w, h = bwSummary.size
     xRatio = w/1920
     yRatio = h/1080
-    xOffset = xRatio*145
-    xStart1 = xRatio*131
-    xStart2 = xRatio*731
-    xStart3 = xRatio*1331
+    xOffset = xRatio*145 #1920x1080 145pixel offset to capture K/A/N values and damage values
+    xStart1 = xRatio*131 #^ 131 pixel start x position for Player 1 ^
+    xStart2 = xRatio*731 #^ 731 pixel start x position for self ^
+    xStart3 = xRatio*1331 #^ 1331 pixel start x position for Player 2 ^
     xEnd1 = xStart1+xOffset
     xEnd2 = xStart2+xOffset
     xEnd3 = xStart3+xOffset
-
-    yOffset = yRatio*35
-    yNext = yRatio*75
-    yStartKDA = yRatio*400
+    yOffset = yRatio*35 # ^ 35 pixel start y position for K/A/N values
+    yNext = yRatio*75 # ^ 75 pixel offset between K/A/N values and damage values
+    yStartKDA = yRatio*400 # ^ 400 pixel start y position for K/A/N values
     yEndKDA = yStartKDA+yOffset
     yStartDmg = yStartKDA+yNext
     yEndDmg = yStartDmg+yOffset
 
-
+    #create list for K/A/N crops ordered as Player 1, Self, Player 2
     KDA = list()
-    KDA.append(im.crop((xStart1, yStartKDA, xEnd1, yEndKDA)))
-    KDA.append(im.crop((xStart2, yStartKDA, xEnd2, yEndKDA)))
-    KDA.append(im.crop((xStart3, yStartKDA, xEnd3, yEndKDA)))
-
+    KDA.append(bwSummary.crop((xStart1, yStartKDA, xEnd1, yEndKDA)))
+    KDA.append(bwSummary.crop((xStart2, yStartKDA, xEnd2, yEndKDA)))
+    KDA.append(bwSummary.crop((xStart3, yStartKDA, xEnd3, yEndKDA)))
+    
+    #create list for damage crops ordered as Player 1, Self, Player 2
     dmg = list()
-    dmg.append(im.crop((xStart1, yStartDmg, xEnd1, yEndDmg)))
-    dmg.append(im.crop((xStart2, yStartDmg, xEnd2, yEndDmg)))
-    dmg.append(im.crop((xStart3, yStartDmg, xEnd3, yEndDmg)))
+    dmg.append(bwSummary.crop((xStart1, yStartDmg, xEnd1, yEndDmg)))
+    dmg.append(bwSummary.crop((xStart2, yStartDmg, xEnd2, yEndDmg)))
+    dmg.append(bwSummary.crop((xStart3, yStartDmg, xEnd3, yEndDmg)))
+
+    #create list for placement crop samples (many different game factors can alter the positioning of this)
+    placement = list()
+    #each crop is shifted right 20 pixels in 1920x1080 format
+    placement.append(bwSummary.crop((xRatio*1450, yRatio*125, xRatio*1580, yRatio*180)))
+    placement.append(bwSummary.crop((xRatio*1470, yRatio*125, xRatio*1580, yRatio*180)))
+    placement.append(bwSummary.crop((xRatio*1490, yRatio*125, xRatio*1580, yRatio*180)))
+    
+    #create list for total team kill crop samples (see above)
+    totalKill = list()
+    #pixel 1920x1080 shifts
+    totalKill.append(bwSummary.crop((xRatio*1720, yRatio*125, xRatio*1825, yRatio*180)))
+    totalKill.append(bwSummary.crop((xRatio*1750, yRatio*125, xRatio*1825, yRatio*180)))
+    totalKill.append(bwSummary.crop((xRatio*1760, yRatio*125, xRatio*1825, yRatio*180)))
 
 
-    placement = im.crop((xRatio*1450, yRatio*125, xRatio*1580, yRatio*180))
-    placement2 = im.crop((xRatio*1470, yRatio*125, xRatio*1580, yRatio*180))
-    placement3 = im.crop((xRatio*1490, yRatio*125, xRatio*1580, yRatio*180))
-#placement.show()
-#placement2.show()
-#placement3.show()
-    totalKill = im.crop((xRatio*1720, yRatio*125, xRatio*1825, yRatio*180))
-    totalKill2 = im.crop((xRatio*1760, yRatio*125, xRatio*1825, yRatio*180))
-#totalKill.show()
-#totalKill2.show()
 
-
-
+    #open temporary stats file for transfer to Excel
     f = open('temp.txt', 'a')
+    
+    #write the K/A/N as without / and each per line
     for x in KDA:
-        text = reader.readtext(asarray(x), allowlist=r'/0123456789')
-#print(text)
-        text = text[0][1]
-        if text.count('/') == 1: #had mirsread a /
-            if(len(text) == 5): #has read / as _
-                text = text[0]+'/'+text[2]+'/'+text[4] #has read as #/#_# or #_#/#
-            elif(len(text) == 4): #did not read /
-                if(text[1] == '/'): #read as #/##
-                    text = text[:3]+'/'+text[3]
-                elif(text[2] == '/'): #read as ##/#
-                    text = text[0]+'/'+text[1:]
-            elif(len(text) == 3): #did not read ANY /
+        text = reader.readtext(asarray(x), allowlist=r'/0123456789') #only read digits and /
+        try: text = text[0][1]
+        except: throw("K/A/N reading error", "OCR Error")
+            
+        #if OCR did not read 2 slashes, try to fix it
+        if(text.count('/') != 2):
+            if(text.count('/') == 0 and len(text) == 3): #read as ###
                 text = text[0]+'/'+text[1]+'/'+text[2]
-            else: #this is extreme edge case where misread a / and is not single digits
-                print("Double Digit Error 1")
-                break
-        elif(text.count('/') == 0): #had misread both /
-            if(len(text) == 3): #read as ###
-                text = text[0]+'/'+text[1]+'/'+text[2]
-            else: #no idea what it should be, has double digits somewhere
-                print("Double Digit Error 2")
-                break
-        elif(text.count('/') > 2): #has too many /, digit is unknown.
-            print(str(text.count('/'))+' Slash Error')
+                    
+            elif text.count('/') == 1: #had mirsread a single /
+                if(len(text) == 5): text = text[0]+'/'+text[2]+'/'+text[4] #has read as #/#_# or #_#/#
+                elif(len(text) == 4): #did not read a /
+                    if(text[1] == '/'): text = text[:3]+'/'+text[3] #read as #/##
+                    elif(text[2] == '/'): text = text[0]+'/'+text[1:] #read as ##/#
+                else: throw("Missing one \'/\'") #this is extreme edge case where misread a / and is not single digits. generally if more than #/#/# then OCR has relative data to work with
+            
+            else: throw("K/A/N containing "+str(text.count('/'))+" \'/\'", "OCR Error") #has too many /, digit is unknown.
+        #after fixing the input, replace / with newlines for writing        
         text = text.replace('/', '\n')
+        #special case of first write to file
         if first:
             f.write(text)
             first = False
-        else:
-            f.write('\n'+text)
+        else: f.write('\n'+text)
+        
+    #write damage to file
     for x in dmg:
-        text = reader.readtext(asarray(x), allowlist=r'0123456789')
-#print(text)
-        if len(text) == 0: #could not read damage.... no idea why, only when damage is 0..
-            text = '0'
-        else: text = text[0][1]
-        if first:
-            f.write(text)
-            first = False
-        else:
-            f.write('\n'+text)
-    #comparison of confidence
-    text = reader.readtext(asarray(placement), allowlist=r'0123456789#')
-    text2 = reader.readtext(asarray(placement2), allowlist=r'0123456789#')
-    text3 = reader.readtext(asarray(placement3), allowlist=r'0123456789#')
-#if(len(text)!=0): print('placement1: '+str(text[0][1])+'|'+str(text[0][2]))
-    if(len(text2)!=0): 
-#print('placement2: '+str(text2[0][1])+'|'+str(text2[0][2]))
-        if(len(text)==0): text = text2
-#if(len(text3)!=0): print('placement3: '+str(text3[0][1])+'|'+str(text3[0][2]))
-    if(len(text)!=0 and len(text2)!=0 and text2[0][2] > text[0][2]): text = text2
-    if(len(text)!=0 and len(text3)!=0 and text3[0][2] > text[0][2]): text = text3
-    if(text[0][1][0]=='#'): text = text[0][1][1:] #take digits after the '#' (first) character
-    else: text = text[0][1]
-    f.write('\n'+text)
-    #comparison of confidence
-    text = reader.readtext(asarray(totalKill), allowlist=r'0123456789')
-    text2 = reader.readtext(asarray(totalKill2), allowlist=r'0123456789')
-#if(len(text)!=0): print('TK1: '+str(text[0][1])+'|'+str(text[0][2]))
-    if(len(text2)!=0):
-#print('TK2: '+str(text2[0][1])+'|'+str(text2[0][2]))
-        if(len(text)==0): text = text2
-    if(len(text)!=0 and len(text2)!=0 and text2[0][2] > text[0][2]): text = text2
-    text = text[0][1].strip()
-    f.write('\n'+text)
-    try:
-        sc2 = os.path.join(scDirectory, dirList[i+1])
-        gray2 = cv.imread(sc2)
-        im2 = Image.fromarray(gray2)
-        im3 = ImageOps.invert(im2)
-        #comparison of confidence
-        rp = im2.crop((xRatio*970, yRatio*644, xRatio*1117, yRatio*700))
-        rp2 = im3.crop((xRatio*970, yRatio*644, xRatio*1117, yRatio*700))
-        part = im2.crop((xRatio*775, yRatio*470, xRatio*930, yRatio*500))
-        part2 = im2.crop((xRatio*775, yRatio*490, xRatio*930, yRatio*520))
-#part.show()
-#part2.show()
-#rp.show()
-#rp2.show()
-        text = reader.readtext(asarray(rp), allowlist=r'-+0123456789')
-        text2 = reader.readtext(asarray(rp2), allowlist=r'-+0123456789')
-#if(len(text)!=0): print('rp1: '+str(text[0][1])+'|'+str(text[0][2]))
-        if(len(text2)!=0): 
-#print('rp2: '+str(text2[0][1])+'|'+str(text2[0][2]))
-            if(len(text)==0): text = text2
-        if(len(text)!=0 and len(text2)!=0 and text2[0][2] > text[0][2]): text = text2
-        text = text[0][1]
-        if(text.isdigit()): #no + or - sign
-            text = '-'+text #most often can not read a '-'
+        text = reader.readtext(asarray(x), allowlist=r'0123456789') #only read digits
+        try: text = text[0][1] #if OCR does not pick up any characters, assume it is 0 damage (this has happened in cases of 0 damage)
+        except: text = '0'
         f.write('\n'+text)
-        text = reader.readtext(asarray(part), allowlist=r'Particpon:0123456789')
-        text2 = reader.readtext(asarray(part2), allowlist=r'Particpon:0123456789')
-        if(len(text)!=0 and len(text2)!=0):
-            if(text2[0][2] > text[0][2]): text = text2
-#print('part: '+str(text[0][1])+'|'+str(text[0][2]))
-        text = text[0][1]
-        f.write('\n'+text[14:])
-    except Exception as e:
-        print(e)
-        os.rename(sc, os.path.join(scDirectory, os.path.join('Completed', dirList[i])))
-        break
-    else:
-        os.rename(sc, os.path.join(scDirectory, os.path.join('Completed', dirList[i])))
-        os.rename(sc2, os.path.join(scDirectory, os.path.join('Completed', dirList[i+1])))
-        break
+        
+        
+    #comparison of confidences
+    confidence = [[None,None,0]] #format of readtext
+    for x in placement:
+        text = reader.readtext(asarray(x), allowlist=r'0123456789#') #only read in digits and '#'
+        if(len(text)==0): continue #if we couldn't read the crop then try another
+        if(text[0][2] > confidence[0][2]): confidence = text #keep track of the best reading
+        
+    if(confidence[0][1] is None): throw("Placement misreading", "OCR Error")
+    if(confidence[0][1][0]=='#'): text = confidence[0][1][1:] #take digits after the '#' if read 
+    else: text = confidence[0][1]
+    f.write('\n'+text)
+    
+    #comparison of confidences
+    confidence = [[None, None, 0]]
+    for x in totalKill:
+        text = reader.readtext(asarray(x), allowlist=r'0123456789') #only read in digits
+        if(len(text)==0): continue #if we couldn't read the crop then try another
+        if(text[0][2] > confidence[0][2]): confidence = text #keep track of the best reading
+    
+    if(confidence[0][1] is None): throw("Total Kill misreading", "OCR Error")
+    text = confidence[0][1]
+    f.write('\n'+text)
+    
+    #attempt post-game summary photo
+    results = os.path.join(scDirectory, dirList[i+1])
+    #this screen uses different colors and as such rgb to gray changes can have issues. use original photo and an inverted
+    standard = Image.fromarray(cv.imread(results))
+    bw2 = ImageOps.invert(standard)
+    
+    #create list for rp crops
+    rp = list()
+    #each crop is different colorations
+    rp.append(standard.crop((xRatio*970, yRatio*644, xRatio*1117, yRatio*700)))
+    rp.append(bw2.crop((xRatio*970, yRatio*644, xRatio*1117, yRatio*700)))
+    
+    #create list for participation crops
+    participation = list()
+    #each crop is different colorations
+    participation.append(standard.crop((xRatio*775, yRatio*470, xRatio*930, yRatio*500)))
+    participation.append(bw2.crop((xRatio*775, yRatio*490, xRatio*930, yRatio*520)))
+    
+    
+    #comparison of confidences
+    confidence = [[None, None, 0]]
+    for x in rp:
+        text = reader.readtext(asarray(x), allowlist=r'-+0123456789') #only read in digits and - or +
+        if(len(text)==0): continue #if we couldn't read the crop then try another
+        if(text[0][2] > confidence[0][2]): confidence = text #keep track of the best reading
+    
+    if(confidence[0][1] is None): throw("RP misreading", "OCR Error")
+    text = confidence[0][1]
+    if(text.isdigit()): text = '-'+text #no + or - sign, set a - sign because this is misread often (+ doesn't have issues so far)
+    f.write('\n'+text)
+    
+    #comparison of confidences
+    confidence = [[None, None, 0]]
+    for x in participation:
+        text = reader.readtext(asarray(x), allowlist=r'Particpon:0123456789') #only read Participation:##
+        if(len(text)==0): continue #if we couldn't read the crop then try another
+        if(text[0][2] > confidence[0][2]): confidence = text #keep track of the best reading
+    
+    if(confidence[0][1] is None): throw("Participation misreading", "OCR Error")
+    text = confidence[0][1]
+    f.write('\n'+text[14:]) #write the number after "Participation:" 
+    
+    #move the files to the "Completed" folder
+    os.rename(summary, os.path.join(scDirectory, os.path.join('Completed', dirList[i])))
+    os.rename(results, os.path.join(scDirectory, os.path.join('Completed', dirList[i+1])))
+    
+    noFiles = False
+    #Continue onto the next pair of photos available
+if(noFiles): throw("No Image Pairs Found In: "+scDirectory, "No Images Found")

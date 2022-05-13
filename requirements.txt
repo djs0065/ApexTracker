@@ -2,4 +2,3 @@ easyocr==1.4.2
 numpy==1.22.3
 opencv_python_headless==4.5.4.60
 Pillow==9.1.0
---extra-index-url https://pypi.ngc.nvidia.com
