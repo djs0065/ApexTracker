@@ -2,6 +2,14 @@
 Personal Project using [EasyOCR](https://github.com/JaidedAI/EasyOCR) and dependencies. [Python 3.10.4](https://www.python.org/downloads/release/python-3104/)
 
 ## What's new
+- May 16, 2022 - Version 2.2
+  - Fixed 2 bugs
+    - Incorrect OCR reading of ' / 's as '1's
+    - Edge case of Participation field being downshifted even further due to 4 different rank participations
+    - See resolved "issues"
+  - QoL Improvements to the Excel
+    - Consistent coloring of graphs
+  - Tested with 2560x1440 & 1728x1080 and appears to be working identically to 1920x1080. (Requires each pair to have same resolution, each pair can have different resolution)
 - May 12, 2022 - Version 2.1
   - Refactored Py and VBA code.
     - Python code reworked for readability/documentation
