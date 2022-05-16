@@ -6,6 +6,8 @@ from numpy import asarray
 import cv2 as cv
 import easyocr
 
+debug = False
+
 
 os.chdir(os.path.split(__file__)[0])
 
@@ -108,7 +110,9 @@ for i in range(0, len(dirList), 2):
         text = reader.readtext(asarray(x), allowlist=r'/0123456789') #only read digits and /
         try: text = text[0][1]
         except: throw("K/A/N reading error", "OCR Error")
-            
+        if(debug): 
+            print(text)
+            x.show()
         #if OCR did not read 2 slashes, try to fix it
         if(text.count('/') != 2):
             if(text.count('/') == 0 and len(text) == 3): #read as ###
@@ -119,10 +123,17 @@ for i in range(0, len(dirList), 2):
                 elif(len(text) == 4): #did not read a /
                     if(text[1] == '/'): text = text[:3]+'/'+text[3] #read as #/##
                     elif(text[2] == '/'): text = text[0]+'/'+text[1:] #read as ##/#
-                else: throw("Missing one \'/\'") #this is extreme edge case where misread a / and is not single digits. generally if more than #/#/# then OCR has relative data to work with
+                else: throw("Missing one \'/ \'") #this is extreme edge case where misread a / and is not single digits. generally if more than #/#/# then OCR has relative data to work with
             
-            else: throw("K/A/N containing "+str(text.count('/'))+" \'/\'", "OCR Error") #has too many /, digit is unknown.
-        #after fixing the input, replace / with newlines for writing        
+            else: 
+                #experimental...
+                text = text[0]+text[1:len(text)-1].replace('1', '/')+text[len(text)-1]
+                if(debug): print(text)
+                #idk what to do, so just throw an error
+                if(text.count('/')!=2): throw("EXPERIMENTAL: K/A/N not enough \' / \'", "OCR/Fix Error, EXPERIMENTAL")      
+           
+        #after fixing the input, replace / with newlines for writing
+        if(debug): print("Fixed Text: "+text)
         text = text.replace('/', '\n')
         #special case of first write to file
         if first:
@@ -178,6 +189,7 @@ for i in range(0, len(dirList), 2):
     #each crop is different colorations
     participation.append(standard.crop((xRatio*775, yRatio*470, xRatio*930, yRatio*500)))
     participation.append(bw2.crop((xRatio*775, yRatio*490, xRatio*930, yRatio*520)))
+    participation.append(bw2.crop((xRatio*775, yRatio*510, xRatio*930, yRatio*540)))
     
     
     #comparison of confidences
@@ -197,6 +209,9 @@ for i in range(0, len(dirList), 2):
     for x in participation:
         text = reader.readtext(asarray(x), allowlist=r'Particpon:0123456789') #only read Participation:##
         if(len(text)==0): continue #if we couldn't read the crop then try another
+        if(debug):
+            x.show()
+            print(text[0][1])
         if(text[0][2] > confidence[0][2]): confidence = text #keep track of the best reading
     
     if(confidence[0][1] is None): throw("Participation misreading", "OCR Error")
@@ -204,8 +219,8 @@ for i in range(0, len(dirList), 2):
     f.write('\n'+text[14:]) #write the number after "Participation:" 
     
     #move the files to the "Completed" folder
-    os.rename(summary, os.path.join(scDirectory, os.path.join('Completed', dirList[i])))
-    os.rename(results, os.path.join(scDirectory, os.path.join('Completed', dirList[i+1])))
+    if(not debug): os.rename(summary, os.path.join(scDirectory, os.path.join('Completed', dirList[i])))
+    if(not debug): os.rename(results, os.path.join(scDirectory, os.path.join('Completed', dirList[i+1])))
     
     noFiles = False
     #Continue onto the next pair of photos available
