@@ -43,7 +43,7 @@ Personal Project using [EasyOCR](https://github.com/JaidedAI/EasyOCR) and depend
   
   or
   
-  Download the [SFX Archive](https://github.com/djs0065/ApexTracker/blob/main/ApexTrackerV2.1.exe)
+  Download the [Latest SFX Archive Release](https://github.com/djs0065/ApexTracker/releases)
   
   ### Step 3
   Edit the config.txt file with your screenshot directory for Apex Legends (Ex. D:\Steam\userdata\###\###\remote\###\screenshots)
