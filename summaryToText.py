@@ -180,9 +180,11 @@ for i in range(0, len(dirList), 2):
     
     #create list for rp crops
     rp = list()
-    #each crop is different colorations
-    rp.append(standard.crop((xRatio*970, yRatio*644, xRatio*1117, yRatio*700)))
-    rp.append(bw2.crop((xRatio*970, yRatio*644, xRatio*1117, yRatio*700)))
+    #each crop diff color and shifted
+    rp.append(standard.crop((xRatio*970, yRatio*645, xRatio*1117, yRatio*700)))
+    rp.append(bw2.crop((xRatio*970, yRatio*645, xRatio*1117, yRatio*700)))
+    rp.append(standard.crop((xRatio*970, yRatio*660, xRatio*1117, yRatio*715)))
+    rp.append(bw2.crop((xRatio*970, yRatio*660, xRatio*1117, yRatio*715)))
     
     #create list for participation crops
     participation = list()
@@ -196,6 +198,9 @@ for i in range(0, len(dirList), 2):
     confidence = [[None, None, 0]]
     for x in rp:
         text = reader.readtext(asarray(x), allowlist=r'-+0123456789') #only read in digits and - or +
+        if(debug): 
+            x.show()
+            print(text[0][1])
         if(len(text)==0): continue #if we couldn't read the crop then try another
         if(text[0][2] > confidence[0][2]): confidence = text #keep track of the best reading
     
